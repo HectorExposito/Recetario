@@ -1,8 +1,11 @@
 from enum import Enum
+from tkinter import filedialog
 from tkinter.tix import ComboBox
+from tkinter.ttk import Combobox
 import Receta
 from tkinter import *
 import tkinter as tk
+from PIL import Image,ImageTk as itk
 
 class Frames(Enum):
     MAIN_MENU=0
@@ -19,6 +22,7 @@ class MyWindow:
         self.root=root
         self.root.title("Recetario")
         self.setMainMenuFrame()
+        self.defaultRecipeImage=Image.open("Recetario/Recetario/res/receta.png")
 
     def configureFrame(self,numberOfCols,numberOfRows):
             frame=Frame(self.root,width=600,height=600)
@@ -85,10 +89,10 @@ class MyWindow:
         list_label.grid(column=1,row=0,sticky=(N,E,S,W)) 
 
         #Set the buttons for the recipe menu
-        addRecipe_button=Button(ingredientsMenu_frame, text="Add recipe",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.RECIPES_MENU))
+        addRecipe_button=Button(ingredientsMenu_frame, text="Add ingredient",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.ADD_INGREDIENTS))
         addRecipe_button.grid(column=1,row=1,sticky=(N,E,S,W))
 
-        seeRecipe_button=Button(ingredientsMenu_frame, text="See recipes",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.INGREDIENTS_MENU))
+        seeRecipe_button=Button(ingredientsMenu_frame, text="See ingredients",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.INGREDIENTS_MENU))
         seeRecipe_button.grid(column=1,row=2,sticky=(N,E,S,W))
 
         return_button=Button(ingredientsMenu_frame, text="Return",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.MAIN_MENU))
@@ -121,7 +125,7 @@ class MyWindow:
         addIngredient_button.grid(column=4,row=1,sticky=(N,E,S,W))
 
         #Ingredients list
-        ingredients_list=Listbox(addRecipe_frame)#,listvariable=self.to_do_names)
+        ingredients_list=Listbox(addRecipe_frame,height=1)#,listvariable=self.to_do_names)
         ingredients_list.grid(column=1,columnspan=4,row=2,sticky=(N,E,S,W))
 
         #Steps info
@@ -135,12 +139,21 @@ class MyWindow:
         addStep_button.grid(column=4,row=3,sticky=(N,E,S,W))
 
         #Steps list
-        steps_list=Listbox(addRecipe_frame,height=10)#,listvariable=self.to_do_names)
+        steps_list=Listbox(addRecipe_frame,height=1)#,listvariable=self.to_do_names)
         steps_list.grid(column=1,columnspan=4,row=4,sticky=(N,E,S,W))
 
         #Image selection
-        image_label=Label(addRecipe_frame,text="Image:")
-        image_label.grid(column=1,row=5,sticky=(N,E,S,W)) 
+        imageText_label=Label(addRecipe_frame,text="Image:")
+        imageText_label.grid(column=1,row=5,sticky=(N,E,S,W)) 
+
+        pi=PhotoImage(file="Recetario/Recetario/res/receta.png")
+        pi=pi.subsample(10,10)
+        image_label=Label(addRecipe_frame,image=pi)
+        image_label.image=pi
+        image_label.grid(column=2,row=5,sticky=(N,E,S,W))
+
+        browseImage_button=Button(addRecipe_frame, text="Browse image",command=self.select_image)
+        browseImage_button.grid(column=3,row=5,sticky=(N,E,S,W))
 
         #Buttons
         addRecipe_button=Button(addRecipe_frame, text="Add recipe")
@@ -148,6 +161,49 @@ class MyWindow:
 
         return_button=Button(addRecipe_frame, text="Return",command=lambda:self.changePanel(addRecipe_frame,Frames.RECIPES_MENU))
         return_button.grid(column=3,row=6,sticky=(N,E,S,W))
+
+    def setAddIngredientFrame(self):
+        addRecipe_frame=self.configureFrame(5,4)
+
+        #Name of the recipe
+        name=""
+        name_label=Label(addRecipe_frame,text="Name:")
+        name_label.grid(column=1,row=0,sticky=(N,E,S,W)) 
+
+        name_entry=Entry(addRecipe_frame, textvariable=name)
+        name_entry.grid(column=2,columnspan=2,row=0,sticky=(N,E,S,W))
+
+        #Ingredient info
+        ingredient_label=Label(addRecipe_frame,text="Measurement:")
+        ingredient_label.grid(column=1,row=1,sticky=(N,E,S,W)) 
+
+        measurement=""
+        measurement_combo=Combobox(addRecipe_frame,values=["Quantity","Litres","Grams","Cups","Spoons","None"])
+        measurement_combo.current(0)
+        measurement_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
+
+        #Image selection
+        imageText_label=Label(addRecipe_frame,text="Image:")
+        imageText_label.grid(column=1,row=2,sticky=(N,E,S,W)) 
+
+        pi=PhotoImage(file="Recetario/Recetario/res/ingrediente.png")
+        pi=pi.subsample(10,10)
+        image_label=Label(addRecipe_frame,image=pi)
+        image_label.image=pi
+        image_label.grid(column=2,row=2,sticky=(N,E,S,W))
+
+        browseImage_button=Button(addRecipe_frame, text="Browse image",command=self.select_image)
+        browseImage_button.grid(column=3,row=2,sticky=(N,E,S,W))
+
+        #Buttons
+        addIngredient_button=Button(addRecipe_frame, text="Add ingredient",command=self.addIngredient)
+        addIngredient_button.grid(column=1,row=3,sticky=(N,E,S,W))
+
+        return_button=Button(addRecipe_frame, text="Return",command=lambda:self.changePanel(addRecipe_frame,Frames.INGREDIENTS_MENU))
+        return_button.grid(column=3,row=3,sticky=(N,E,S,W))
+
+    def addIngredient(self):
+        print("ingrediente añadido")
 
     def changePanel(self,frameToClose,frameToChange):
         frameToClose.destroy()
@@ -160,6 +216,20 @@ class MyWindow:
             self.setIngredientsMenuFrame()
         elif(frameToChange==Frames.ADD_RECIPE):
             self.setAddRecipeFrame()
+        elif(frameToChange==Frames.ADD_INGREDIENTS):
+            self.setAddIngredientFrame()
+
+    def select_image(self):
+        filetypes = (
+        ('text files', '*.txt'),
+        ('All files', '*.*')
+        )
+
+        filename = filedialog.askopenfilename(
+        title='Open a file',
+        initialdir='/',
+        filetypes=filetypes)
+
 
     def closeApp(self):
         self.root.destroy()

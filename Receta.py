@@ -1,50 +1,46 @@
-
+import Bdd
 from numpy import append
+import sqlalchemy as db
+from sqlalchemy import Column, Integer, String, Float, BLOB
 
+class Ingredient(Bdd.Base):
+    __tablename__='ingredients'
 
-class Ingredientes:
-    def __init__(self,medida,nombre):
-        self.medida=medida
-        self.nombre=nombre
+    name = Column(String, primary_key=True)
+    measurement = Column(String, nullable=False)
+    image = Column(BLOB)
+
+    def __init__(self,name,measurement,image):
+        self.measurement=measurement
+        self.name=name
+        self.image=image
     
-    def getMedida(self):
-        return self.medida
+    def getMeasurement(self):
+        return self.measurement
 
-    def getNombre(self):
-        return self.nombre
+    def getName(self):
+        return self.name
 
-class Receta:
-    def __init__(self,nombre,ingredientes):
-        self.ingredientes=ingredientes
-        self.nombre=nombre
+class Recipe():
+    
+    def __init__(self,name,ingredients,image):
+        self.ingredients=ingredients
+        self.name=name
+        self.image=image
 
-    def getIngredientes(self):
-        return self.ingredientes
+    def getIngredients(self):
+        return self.ingredients
 
-    def getNombre(self):
-        return self.nombre
+    def getName(self):
+        return self.name
 
+class RecipeAndIngredient():
+    def __init__(self,recipeName,recipeIngredient):
+        self.recipeName=recipeName
+        self.recipeIngredient=recipeIngredient
 class Recetario:
     def __init__(self):
         self.recetas=[]
 
     def addReceta(self,receta):
         self.recetas=append(self.recetas,receta)
-
-ingr=[]
-for i in range(0,10):
-    ingr.append(Ingredientes("Cucharada","Ingrediente {}"+str(i)))
-
-for i in range(0,10):
-   print(ingr[i].getMedida(),ingr[i].getNombre())
-
-rec=[]
-for i in range(0,10):
-   rec.append(Receta("Receta "+str(i),ingr))
-
-for i in range(0,10):
-    ing=""
-    lista=rec[i].getIngredientes()
-    for j in range(0,len(lista)):
-        ing+=lista[j].getNombre()+","
-    print(rec[i].getNombre(),ing)

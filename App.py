@@ -1,8 +1,14 @@
+from ast import stmt
 from enum import Enum
+from sqlite3 import Blob
 from tkinter import filedialog
+from tkinter import ttk
 from tkinter.tix import ComboBox
-from tkinter.ttk import Combobox
-import Receta
+from tkinter.ttk import Combobox, Treeview
+
+from sqlalchemy import BLOB, null
+import Receta as receta
+import Bdd as bdd
 from tkinter import *
 import tkinter as tk
 from PIL import Image,ImageTk as itk
@@ -24,6 +30,7 @@ class MyWindow:
         self.setMainMenuFrame()
         self.defaultRecipeImage=Image.open("Recetario/Recetario/res/receta.png")
 
+#region GUI
     def configureFrame(self,numberOfCols,numberOfRows):
             frame=Frame(self.root,width=600,height=600)
             frame.grid(column=1,row=1,sticky=(N,E,S,W))
@@ -92,7 +99,7 @@ class MyWindow:
         addRecipe_button=Button(ingredientsMenu_frame, text="Add ingredient",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.ADD_INGREDIENTS))
         addRecipe_button.grid(column=1,row=1,sticky=(N,E,S,W))
 
-        seeRecipe_button=Button(ingredientsMenu_frame, text="See ingredients",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.INGREDIENTS_MENU))
+        seeRecipe_button=Button(ingredientsMenu_frame, text="See ingredients",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.SEE_INGREDIENTS))
         seeRecipe_button.grid(column=1,row=2,sticky=(N,E,S,W))
 
         return_button=Button(ingredientsMenu_frame, text="Return",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.MAIN_MENU))
@@ -166,31 +173,32 @@ class MyWindow:
         addRecipe_frame=self.configureFrame(5,4)
 
         #Name of the recipe
-        name=""
         name_label=Label(addRecipe_frame,text="Name:")
         name_label.grid(column=1,row=0,sticky=(N,E,S,W)) 
 
-        name_entry=Entry(addRecipe_frame, textvariable=name)
-        name_entry.grid(column=2,columnspan=2,row=0,sticky=(N,E,S,W))
+        self.ingredientName_entry=Entry(addRecipe_frame)
+        self.ingredientName_entry.grid(column=2,columnspan=2,row=0,sticky=(N,E,S,W))
 
         #Ingredient info
         ingredient_label=Label(addRecipe_frame,text="Measurement:")
         ingredient_label.grid(column=1,row=1,sticky=(N,E,S,W)) 
 
         measurement=""
-        measurement_combo=Combobox(addRecipe_frame,values=["Quantity","Litres","Grams","Cups","Spoons","None"])
-        measurement_combo.current(0)
-        measurement_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
+        self.measurement_combo=Combobox(addRecipe_frame,values=["Quantity","Litres","Grams","Cups","Spoons","None"])
+        self.measurement_combo.current(0)
+        self.measurement_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
 
         #Image selection
         imageText_label=Label(addRecipe_frame,text="Image:")
         imageText_label.grid(column=1,row=2,sticky=(N,E,S,W)) 
 
-        pi=PhotoImage(file="Recetario/Recetario/res/ingrediente.png")
+
+        self.ingredientImagePath="Recetario/Recetario/res/ingrediente.png"
+        pi=PhotoImage(file=self.ingredientImagePath)
         pi=pi.subsample(10,10)
-        image_label=Label(addRecipe_frame,image=pi)
-        image_label.image=pi
-        image_label.grid(column=2,row=2,sticky=(N,E,S,W))
+        ingredientImage_label=Label(addRecipe_frame,image=pi)
+        ingredientImage_label.image=pi
+        ingredientImage_label.grid(column=2,row=2,sticky=(N,E,S,W))
 
         browseImage_button=Button(addRecipe_frame, text="Browse image",command=self.select_image)
         browseImage_button.grid(column=3,row=2,sticky=(N,E,S,W))
@@ -202,8 +210,30 @@ class MyWindow:
         return_button=Button(addRecipe_frame, text="Return",command=lambda:self.changePanel(addRecipe_frame,Frames.INGREDIENTS_MENU))
         return_button.grid(column=3,row=3,sticky=(N,E,S,W))
 
-    def addIngredient(self):
-        print("ingrediente añadido")
+    def setSeeIngredientsFrame(self,ingredients):
+        seeRecipe_frame=self.configureFrame(2,3)
+
+        ingredients=ingredients
+        #Table
+        ingredients_table=ttk.Treeview(seeRecipe_frame)
+        ingredients_table.grid(column=0,columnspan=2,row=1,sticky=(N,E,S,W))
+        ingredients_table['columns'] = ('name', 'measurement', 'image')
+        ingredients_table.column("#0", width=0,  stretch=NO)
+        ingredients_table.heading("#0",text="",anchor=CENTER)
+        ingredients_table.heading("name",text="NAME",anchor=CENTER)
+        ingredients_table.heading("measurement",text="MEASUREMENT",anchor=CENTER)
+        ingredients_table.heading("image",text="IMAGE",anchor=CENTER)
+        col=0
+        for ing in ingredients:
+            print(col)
+            ingredients_table.insert(parent='',index='end',iid=col,text='',values=(ing.name,ing.measurement,ing.image))
+            col=col+1
+        #Buttons
+        editIngredient_button=Button(seeRecipe_frame, text="Edit ingredient",command=self.addIngredient)
+        editIngredient_button.grid(column=0,row=2,sticky=(N,E,S,W))
+
+        return_button=Button(seeRecipe_frame, text="Return",command=lambda:self.changePanel(seeRecipe_frame,Frames.INGREDIENTS_MENU))
+        return_button.grid(column=1,row=2,sticky=(N,E,S,W))
 
     def changePanel(self,frameToClose,frameToChange):
         frameToClose.destroy()
@@ -218,7 +248,39 @@ class MyWindow:
             self.setAddRecipeFrame()
         elif(frameToChange==Frames.ADD_INGREDIENTS):
             self.setAddIngredientFrame()
+        elif(frameToChange==Frames.SEE_INGREDIENTS):
+            selectIngredients=bdd.select(receta.Ingredient)
+            ingredients=[]
+            for ing in bdd.session.execute(selectIngredients):
+                print("bdd")
+                ingredients.append(ing[0])
+            bdd.session.commit()
+            self.setSeeIngredientsFrame(ingredients)
 
+#endregion
+
+    def convertToBinaryData(self,filename):
+        # Convert binary format to images or files data
+        with open(filename, 'rb') as file:
+            blobData = file.read()
+        return blobData
+
+    def addIngredient(self):
+        n=self.ingredientName_entry.get()
+        m=self.measurement_combo.get()
+        i=self.convertToBinaryData(self.ingredientImagePath)
+        if(len(n)<3):
+            print("nombre no valido")
+            return
+        
+        i=receta.Ingredient(n,m,i)
+        bdd.session.add(i)
+        bdd.session.commit()
+        print("ingrediente añadido "+n+" "+m)
+
+    
+
+  
     def select_image(self):
         filetypes = (
         ('text files', '*.txt'),
@@ -234,7 +296,7 @@ class MyWindow:
     def closeApp(self):
         self.root.destroy()
 
-
+bdd.Base.metadata.create_all(bdd.engine)
 root=Tk()
 root.geometry("600x600")
 root.resizable(width=False, height=False)

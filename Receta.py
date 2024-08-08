@@ -20,6 +20,19 @@ class Ingredient(Bdd.Base):
 
     def getName(self):
         return self.name
+    
+    def getImage(self):
+        return self.image
+    
+    def __eq__(self, other): 
+        if not isinstance(other, Ingredient):
+            # don't attempt to compare against unrelated types
+            return False
+        
+        if(self.name==other.name):
+            return True
+        
+        return False
 
 class Recipe():
     

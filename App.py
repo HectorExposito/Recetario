@@ -1,5 +1,8 @@
 from ast import stmt
+import base64
 from enum import Enum
+from io import BytesIO
+import io
 from sqlite3 import Blob
 from tkinter import filedialog
 from tkinter import ttk
@@ -21,12 +24,15 @@ class Frames(Enum):
     SEE_RECIPES=4
     ADD_INGREDIENTS=5
     SEE_INGREDIENTS=6
+    EDIT_INGREDIENTS=7
 
 class MyWindow:
 
     def __init__(self,root):
         self.root=root
         self.root.title("Recetario")
+        self.root.protocol("WM_DELETE_WINDOW",self.closeApp)
+        self.loadAllIngrediennts()
         self.setMainMenuFrame()
         self.defaultRecipeImage=Image.open("Recetario/Recetario/res/receta.png")
 
@@ -96,11 +102,11 @@ class MyWindow:
         list_label.grid(column=1,row=0,sticky=(N,E,S,W)) 
 
         #Set the buttons for the recipe menu
-        addRecipe_button=Button(ingredientsMenu_frame, text="Add ingredient",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.ADD_INGREDIENTS))
-        addRecipe_button.grid(column=1,row=1,sticky=(N,E,S,W))
+        addIngredient_button=Button(ingredientsMenu_frame, text="Add ingredient",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.ADD_INGREDIENTS))
+        addIngredient_button.grid(column=1,row=1,sticky=(N,E,S,W))
 
-        seeRecipe_button=Button(ingredientsMenu_frame, text="See ingredients",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.SEE_INGREDIENTS))
-        seeRecipe_button.grid(column=1,row=2,sticky=(N,E,S,W))
+        seeIngredients_button=Button(ingredientsMenu_frame, text="See ingredients",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.SEE_INGREDIENTS))
+        seeIngredients_button.grid(column=1,row=2,sticky=(N,E,S,W))
 
         return_button=Button(ingredientsMenu_frame, text="Return",command=lambda:self.changePanel(ingredientsMenu_frame,Frames.MAIN_MENU))
         return_button.grid(column=1,row=3,sticky=(N,E,S,W))
@@ -121,25 +127,33 @@ class MyWindow:
         ingredient_label.grid(column=1,row=1,sticky=(N,E,S,W)) 
 
         ingredient=""
+        ingredientsNames=[]
+        for ing in self.allIngredients:
+            ingredientsNames.append(ing.name)
+        self.ingredients_combo=Combobox(addRecipe_frame,values=ingredientsNames,textvariable=ingredient)
+        self.ingredients_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
+        self.ingredients_combo.bind('<<ComboboxSelected>>', self.comboBoxModified)
         #ingredients_combo=ComboBox(addRecipe_frame,values=["a","b","c"],textvariable=ingredient)
         #ingredients_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
 
-        quantity=0
-        quantity_entry=Entry(addRecipe_frame, textvariable=quantity)
-        quantity_entry.grid(column=3,row=1,sticky=(N,E,S,W))
+        self.quantity_entry=Entry(addRecipe_frame)
+        self.quantity_entry.grid(column=3,row=1,sticky=(N,E,S,W))
 
-        addIngredient_button=Button(addRecipe_frame, text="Add")
+        addIngredient_button=Button(addRecipe_frame, text="Add",command=self.addIngredientToRecipe)
         addIngredient_button.grid(column=4,row=1,sticky=(N,E,S,W))
 
         #Ingredients list
-        ingredients_list=Listbox(addRecipe_frame,height=1)#,listvariable=self.to_do_names)
-        ingredients_list.grid(column=1,columnspan=4,row=2,sticky=(N,E,S,W))
+        self.ingredients_list=Listbox(addRecipe_frame,height=1)#,listvariable=self.to_do_names)
+        self.ingredients_list.grid(column=1,columnspan=4,row=2,sticky=(N,E,S,W))
+        scrollBar=ttk.Scrollbar(self.ingredients_list,orient="vertical",command=self.ingredients_list.yview)
+        scrollBar.pack(side='right', fill='y')
+        self.ingredients_list.configure(yscrollcommand=scrollBar.set)
 
         #Steps info
         step_label=Label(addRecipe_frame,text="Step:")
         step_label.grid(column=1,row=3,sticky=(N,E,S,W)) 
 
-        step_entry=Entry(addRecipe_frame, textvariable=quantity)
+        step_entry=Entry(addRecipe_frame)
         step_entry.grid(column=2,columnspan=2,row=3,sticky=(N,E,S,W))
 
         addStep_button=Button(addRecipe_frame, text="Add")
@@ -148,6 +162,9 @@ class MyWindow:
         #Steps list
         steps_list=Listbox(addRecipe_frame,height=1)#,listvariable=self.to_do_names)
         steps_list.grid(column=1,columnspan=4,row=4,sticky=(N,E,S,W))
+        scrollBar=ttk.Scrollbar(steps_list,orient="vertical",command=steps_list.yview)
+        scrollBar.pack(side='right', fill='y')
+        steps_list.configure(yscrollcommand=scrollBar.set)
 
         #Image selection
         imageText_label=Label(addRecipe_frame,text="Image:")
@@ -210,30 +227,93 @@ class MyWindow:
         return_button=Button(addRecipe_frame, text="Return",command=lambda:self.changePanel(addRecipe_frame,Frames.INGREDIENTS_MENU))
         return_button.grid(column=3,row=3,sticky=(N,E,S,W))
 
-    def setSeeIngredientsFrame(self,ingredients):
+    def setSeeIngredientsFrame(self):
         seeRecipe_frame=self.configureFrame(2,3)
 
-        ingredients=ingredients
         #Table
-        ingredients_table=ttk.Treeview(seeRecipe_frame)
-        ingredients_table.grid(column=0,columnspan=2,row=1,sticky=(N,E,S,W))
-        ingredients_table['columns'] = ('name', 'measurement', 'image')
-        ingredients_table.column("#0", width=0,  stretch=NO)
-        ingredients_table.heading("#0",text="",anchor=CENTER)
-        ingredients_table.heading("name",text="NAME",anchor=CENTER)
-        ingredients_table.heading("measurement",text="MEASUREMENT",anchor=CENTER)
-        ingredients_table.heading("image",text="IMAGE",anchor=CENTER)
-        col=0
-        for ing in ingredients:
-            print(col)
-            ingredients_table.insert(parent='',index='end',iid=col,text='',values=(ing.name,ing.measurement,ing.image))
-            col=col+1
+        self.ingredients_table=ttk.Treeview(seeRecipe_frame)
+
+        scrollBar=ttk.Scrollbar(self.ingredients_table,orient="vertical",command=self.ingredients_table.yview)
+        scrollBar.pack(side='right', fill='y')
+        self.ingredients_table.configure(yscrollcommand=scrollBar.set)
+
+        style=ttk.Style(self.ingredients_table)
+        style.configure("Treeview",rowheight=100)
+
+        self.ingredients_table.grid(column=0,columnspan=2,row=1,sticky=(N,E,S,W))
+        self.ingredients_table['columns'] = ('name', 'measurement', 'image')
+        self.ingredients_table.column("#0", width=0,  stretch=NO)
+        self.ingredients_table.heading("#0",text="",anchor=CENTER)
+        self.ingredients_table.heading("name",text="NAME",anchor=CENTER)
+        self.ingredients_table.column("name", width=150,  stretch=YES)
+        self.ingredients_table.heading("measurement",text="MEASUREMENT",anchor=CENTER)
+        self.ingredients_table.column("measurement", width=150,  stretch=YES)
+        self.ingredients_table.heading("image",text="IMAGE",anchor=CENTER)
+        self.ingredients_table.column("image", width=300,  stretch=NO)
+        row=0
+        for ing in self.allIngredients:
+            print(row)
+            im = Image.open(io.BytesIO(ing.getImage()))
+            im.thumbnail((100,100))
+            photo = itk.PhotoImage(im)
+            self.ingredients_table.insert(parent='',index='end',iid=row,text='',values=(ing.name,ing.measurement),image=photo)
+            self.ingredients_table.rowconfigure(index=row,minsize=300)
+            row=row+1
+        self.ingredients_table.bind("<<TreeviewSelect>>", lambda s: self.selectIngredientToEdit())
         #Buttons
-        editIngredient_button=Button(seeRecipe_frame, text="Edit ingredient",command=self.addIngredient)
-        editIngredient_button.grid(column=0,row=2,sticky=(N,E,S,W))
+        self.editIngredient_button=Button(seeRecipe_frame, text="Edit ingredient",command=lambda:self.selectItemToEdit(seeRecipe_frame,Frames.EDIT_INGREDIENTS),state=tk.DISABLED)
+        self.editIngredient_button.grid(column=0,row=2,sticky=(N,E,S,W))
 
         return_button=Button(seeRecipe_frame, text="Return",command=lambda:self.changePanel(seeRecipe_frame,Frames.INGREDIENTS_MENU))
         return_button.grid(column=1,row=2,sticky=(N,E,S,W))
+
+    def setEditIngredientFrame(self):
+        editIngredient=self.configureFrame(5,4)
+
+        ingredientToEditCopy=self.ingredientToEdit
+
+        #Name of the recipe
+        name_label=Label(editIngredient,text="Name:")
+        name_label.grid(column=1,row=0,sticky=(N,E,S,W)) 
+
+        self.editIngredientName_entry=Entry(editIngredient)
+        self.editIngredientName_entry.insert(0,ingredientToEditCopy.getName())
+        self.editIngredientName_entry.grid(column=2,columnspan=2,row=0,sticky=(N,E,S,W))
+
+        #Ingredient info
+        ingredient_label=Label(editIngredient,text="Measurement:")
+        ingredient_label.grid(column=1,row=1,sticky=(N,E,S,W)) 
+
+        measurement=""
+        self.editMeasurement_combo=Combobox(editIngredient,values=["Quantity","Litres","Grams","Cups","Spoons","None"])
+        i=0
+        for val in self.editMeasurement_combo["values"]:
+            if(val==ingredientToEditCopy.getMeasurement()):
+                break
+            i+=1
+        self.editMeasurement_combo.current(i)
+        self.editMeasurement_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
+
+        #Image selection
+        imageText_label=Label(editIngredient,text="Image:")
+        imageText_label.grid(column=1,row=2,sticky=(N,E,S,W)) 
+
+        self.ingredientImagePath="Recetario/Recetario/res/ingrediente.png"
+        pi=PhotoImage(file=self.ingredientImagePath)
+        pi=pi.subsample(10,10)
+        ingredientImage_label=Label(editIngredient,image=pi)
+        ingredientImage_label.image=pi
+        ingredientImage_label.grid(column=2,row=2,sticky=(N,E,S,W))
+
+        browseImage_button=Button(editIngredient, text="Browse image",command=self.select_image)
+        browseImage_button.grid(column=3,row=2,sticky=(N,E,S,W))
+
+        #Buttons
+        saveIngredient_button=Button(editIngredient, text="Save ingredient",command=lambda:self.editIngredient(editIngredient))
+        saveIngredient_button.grid(column=1,row=3,sticky=(N,E,S,W))
+
+        return_button=Button(editIngredient, text="Return",command=lambda:self.changePanel(editIngredient,Frames.SEE_INGREDIENTS))
+        return_button.grid(column=3,row=3,sticky=(N,E,S,W))
 
     def changePanel(self,frameToClose,frameToChange):
         frameToClose.destroy()
@@ -249,22 +329,12 @@ class MyWindow:
         elif(frameToChange==Frames.ADD_INGREDIENTS):
             self.setAddIngredientFrame()
         elif(frameToChange==Frames.SEE_INGREDIENTS):
-            selectIngredients=bdd.select(receta.Ingredient)
-            ingredients=[]
-            for ing in bdd.session.execute(selectIngredients):
-                print("bdd")
-                ingredients.append(ing[0])
-            bdd.session.commit()
-            self.setSeeIngredientsFrame(ingredients)
+            self.setSeeIngredientsFrame()
+        elif(frameToChange==Frames.EDIT_INGREDIENTS):
+            self.setEditIngredientFrame()
 
 #endregion
-
-    def convertToBinaryData(self,filename):
-        # Convert binary format to images or files data
-        with open(filename, 'rb') as file:
-            blobData = file.read()
-        return blobData
-
+#region save and edit ingredients
     def addIngredient(self):
         n=self.ingredientName_entry.get()
         m=self.measurement_combo.get()
@@ -273,14 +343,97 @@ class MyWindow:
             print("nombre no valido")
             return
         
-        i=receta.Ingredient(n,m,i)
-        bdd.session.add(i)
-        bdd.session.commit()
+        ingredient=receta.Ingredient(n,m,i)
+        if(self.allIngredients.__contains__(ingredient)==False):
+            self.allIngredients.append(ingredient)
+        
+        
         print("ingrediente añadido "+n+" "+m)
 
-    
+    def editIngredient(self,editFrame):
+        n=self.editIngredientName_entry.get()
+        m=self.editMeasurement_combo.get()
+        i=self.convertToBinaryData(self.ingredientImagePath)
+        if(len(n)<3):
+            print("nombre no valido")
+            return
+        ingredient=receta.Ingredient(n,m,i)
 
-  
+        for ing in self.allIngredients:
+            if(self.ingredientToEdit==ing):
+                self.allIngredients.remove(ing)
+                self.removeIngredientFromDataBase(ing)
+                self.allIngredients.append(ingredient)
+                break
+        
+        print("ingrediente editado: "+self.ingredientToEdit.getName()+" "+self.ingredientToEdit.getMeasurement()+"\n"+
+              ""+ing.getName()+" "+ing.getMeasurement())
+        self.ingredientToEdit=null
+        self.changePanel(editFrame,Frames.SEE_INGREDIENTS)
+     
+    def selectIngredientToEdit(self):
+        if(self.editIngredient_button["state"]==tk.DISABLED):
+            self.editIngredient_button["state"]=tk.NORMAL
+        
+    def selectItemToEdit(self,frameToClose,frameToChange):
+        ingredientToEdit=self.ingredients_table.item(self.ingredients_table.focus())
+        
+        ingredientName=ingredientToEdit["values"][0]
+        for ing in self.allIngredients:
+            print(ing.getName()+" "+ingredientName)
+            if(ing.getName()==ingredientName):
+                self.ingredientToEdit=ing
+                break
+        
+        self.changePanel(frameToClose,frameToChange)
+    
+#endregion
+#region save and edit recipe
+    def comboBoxModified(self,event):
+        i=self.ingredients_combo.current()
+        ing=self.allIngredients[i]
+        if(ing.measurement=="None"):
+            self.quantity_entry.config(state='disabled')
+        else:
+            self.quantity_entry.config(state='normal')
+
+    def addIngredientToRecipe(self):
+        q=self.quantity_entry.get()+" "
+        m=""
+        i=self.ingredients_combo.current()
+        ing=self.allIngredients[i]
+
+        if(self.checkIfIngredientIsAlreadyOnRecipe(ing)==False):
+            if(ing.measurement!="Quantity"):
+                m=ing.measurement+" "
+            if(ing.measurement=="None"):
+                    q=""
+                    m=""
+            self.ingredients_list.insert(len(self.ingredients_list.get(0,last=None)),q+""+m+""+ing.name)
+        else:
+            print("Ingrediente ya añadido")
+        
+    def checkIfIngredientIsAlreadyOnRecipe(self,ing):
+        for i in self.ingredients_list.get(0,last=None):
+            if ing.name in i:
+                return True
+        return False
+    
+#endregion
+    def loadAllIngrediennts(self):
+        selectIngredients=bdd.select(receta.Ingredient)
+        self.allIngredients=[]
+        for ing in bdd.session.execute(selectIngredients):
+            print("bdd")
+            self.allIngredients.append(ing[0])
+    def removeIngredientFromDataBase(self,ing):
+        bdd.session.delete(ing)
+    def convertToBinaryData(self,filename):
+        # Convert binary format to images or files data
+        with open(filename, 'rb') as file:
+            blobData = file.read()
+        return blobData
+
     def select_image(self):
         filetypes = (
         ('text files', '*.txt'),
@@ -291,9 +444,14 @@ class MyWindow:
         title='Open a file',
         initialdir='/',
         filetypes=filetypes)
-
-
+    def saveIngredientsOnDataBase(self):
+        for ingredient in self.allIngredients:
+            bdd.session.add(ingredient)
+            bdd.session.commit()
+    
     def closeApp(self):
+        print("asdasdasdasd")
+        self.saveIngredientsOnDataBase()
         self.root.destroy()
 
 bdd.Base.metadata.create_all(bdd.engine)

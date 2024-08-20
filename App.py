@@ -33,6 +33,7 @@ class MyWindow:
         self.root.title("Recetario")
         self.root.protocol("WM_DELETE_WINDOW",self.closeApp)
         self.loadAllIngrediennts()
+        self.loadAllRecipes()
         self.setMainMenuFrame()
         self.defaultRecipeImage=Image.open("Recetario/Recetario/res/receta.png")
 
@@ -113,14 +114,16 @@ class MyWindow:
 
     def setAddRecipeFrame(self):
         addRecipe_frame=self.configureFrame(6,7)
+        addRecipe_frame.grid_rowconfigure(3,weight=1)
+        addRecipe_frame.grid_columnconfigure(2,weight=1)
 
         #Name of the recipe
         name=""
         name_label=Label(addRecipe_frame,text="Name:")
         name_label.grid(column=1,row=0,sticky=(N,E,S,W)) 
 
-        name_entry=Entry(addRecipe_frame, textvariable=name)
-        name_entry.grid(column=2,columnspan=3,row=0,sticky=(N,E,S,W))
+        self.name_entry=Entry(addRecipe_frame, textvariable=name)
+        self.name_entry.grid(column=2,columnspan=3,row=0,sticky=(N,E,S,W))
 
         #Ingredient info
         ingredient_label=Label(addRecipe_frame,text="Ingredient:")
@@ -153,18 +156,18 @@ class MyWindow:
         step_label=Label(addRecipe_frame,text="Step:")
         step_label.grid(column=1,row=3,sticky=(N,E,S,W)) 
 
-        step_entry=Entry(addRecipe_frame)
-        step_entry.grid(column=2,columnspan=2,row=3,sticky=(N,E,S,W))
+        self.step_text=Text(addRecipe_frame,wrap="word",width=1,height=1)
+        self.step_text.grid(column=2,columnspan=2,row=3,sticky="nsew")
 
-        addStep_button=Button(addRecipe_frame, text="Add")
+        addStep_button=Button(addRecipe_frame, text="Add",command=self.addStepToList)
         addStep_button.grid(column=4,row=3,sticky=(N,E,S,W))
 
         #Steps list
-        steps_list=Listbox(addRecipe_frame,height=1)#,listvariable=self.to_do_names)
-        steps_list.grid(column=1,columnspan=4,row=4,sticky=(N,E,S,W))
-        scrollBar=ttk.Scrollbar(steps_list,orient="vertical",command=steps_list.yview)
+        self.steps_list=Listbox(addRecipe_frame,height=1)
+        self.steps_list.grid(column=1,columnspan=4,row=4,sticky=(N,E,S,W))
+        scrollBar=ttk.Scrollbar(self.steps_list,orient="vertical",command=self.steps_list.yview)
         scrollBar.pack(side='right', fill='y')
-        steps_list.configure(yscrollcommand=scrollBar.set)
+        self.steps_list.configure(yscrollcommand=scrollBar.set)
 
         #Image selection
         imageText_label=Label(addRecipe_frame,text="Image:")
@@ -180,7 +183,7 @@ class MyWindow:
         browseImage_button.grid(column=3,row=5,sticky=(N,E,S,W))
 
         #Buttons
-        addRecipe_button=Button(addRecipe_frame, text="Add recipe")
+        addRecipe_button=Button(addRecipe_frame, text="Add recipe",command=self.addRecipe)
         addRecipe_button.grid(column=2,row=6,sticky=(N,E,S,W))
 
         return_button=Button(addRecipe_frame, text="Return",command=lambda:self.changePanel(addRecipe_frame,Frames.RECIPES_MENU))
@@ -315,6 +318,44 @@ class MyWindow:
         return_button=Button(editIngredient, text="Return",command=lambda:self.changePanel(editIngredient,Frames.SEE_INGREDIENTS))
         return_button.grid(column=3,row=3,sticky=(N,E,S,W))
 
+    def setSeeRecipes(self):
+        seeRecipe_frame=self.configureFrame(2,3)
+
+        #Table
+        self.recipes_table=ttk.Treeview(seeRecipe_frame)
+
+        scrollBar=ttk.Scrollbar(self.recipes_table,orient="vertical",command=self.recipes_table.yview)
+        scrollBar.pack(side='right', fill='y')
+        self.recipes_table.configure(yscrollcommand=scrollBar.set)
+
+        style=ttk.Style(self.recipes_table)
+        style.configure("Treeview",rowheight=100)
+
+        self.recipes_table.grid(column=0,columnspan=2,row=1,sticky=(N,E,S,W))
+        self.recipes_table['columns'] = ('name', 'image')
+        self.recipes_table.column("#0", width=0,  stretch=NO)
+        self.recipes_table.heading("#0",text="",anchor=CENTER)
+        self.recipes_table.heading("name",text="NAME",anchor=CENTER)
+        self.recipes_table.column("name", width=150,  stretch=YES)
+        self.recipes_table.heading("image",text="IMAGE",anchor=CENTER)
+        self.recipes_table.column("image", width=300,  stretch=NO)
+        row=0
+        for r in self.allRecipes:
+            print(row)
+            im = Image.open(io.BytesIO(r.getImage()))
+            im.thumbnail((100,100))
+            photo = itk.PhotoImage(im)
+            self.recipes_table.insert(parent='',index='end',iid=row,text='',values=(r.name),image=photo)
+            self.recipes_table.rowconfigure(index=row,minsize=300)
+            row=row+1
+        self.recipes_table.bind("<<TreeviewSelect>>", lambda s: self.selectIngredientToEdit())
+        #Buttons
+        self.editIngredient_button=Button(seeRecipe_frame, text="Edit ingredient",command=lambda:self.selectItemToEdit(seeRecipe_frame,Frames.EDIT_INGREDIENTS),state=tk.DISABLED)
+        self.editIngredient_button.grid(column=0,row=2,sticky=(N,E,S,W))
+
+        return_button=Button(seeRecipe_frame, text="Return",command=lambda:self.changePanel(seeRecipe_frame,Frames.RECIPES_MENU))
+        return_button.grid(column=1,row=2,sticky=(N,E,S,W))
+
     def changePanel(self,frameToClose,frameToChange):
         frameToClose.destroy()
 
@@ -332,8 +373,11 @@ class MyWindow:
             self.setSeeIngredientsFrame()
         elif(frameToChange==Frames.EDIT_INGREDIENTS):
             self.setEditIngredientFrame()
+        elif(frameToChange==Frames.SEE_RECIPES):
+            self.setSeeRecipes()
 
 #endregion
+
 #region save and edit ingredients
     def addIngredient(self):
         n=self.ingredientName_entry.get()
@@ -399,6 +443,7 @@ class MyWindow:
 
     def addIngredientToRecipe(self):
         q=self.quantity_entry.get()+" "
+        q=q.strip()
         m=""
         i=self.ingredients_combo.current()
         ing=self.allIngredients[i]
@@ -407,25 +452,97 @@ class MyWindow:
             if(ing.measurement!="Quantity"):
                 m=ing.measurement+" "
             if(ing.measurement=="None"):
-                    q=""
-                    m=""
+                q=""
+                m=""
+            else:
+                try:
+                    float(q)
+                except ValueError:
+                    print("Not a float")
+                    return
+
             self.ingredients_list.insert(len(self.ingredients_list.get(0,last=None)),q+""+m+""+ing.name)
-        else:
-            print("Ingrediente ya añadido")
         
+        self.quantity_entry.delete(0, 'end')
+
     def checkIfIngredientIsAlreadyOnRecipe(self,ing):
-        for i in self.ingredients_list.get(0,last=None):
+        for i in self.ingredients_list.get(0,last=self.ingredients_list.size()):
             if ing.name in i:
+                print("Existe ingrediente")
                 return True
+        print("No existe ingrediente")
         return False
     
+    def addStepToList(self):
+        step=self.step_text.get("1.0",END)
+        step=step.strip()
+        if(len(step)>=3):
+            stepNumber=self.steps_list.size()+1
+            step=str(stepNumber)+": "+step
+            self.steps_list.insert(stepNumber-1,step)
+            self.step_text.delete("1.0",END)
+        
+    def addRecipe(self):
+        n=self.name_entry.get()
+        n=n.strip()
+        ing=self.ingredients_list.get(0,last=self.ingredients_list.size())
+        steps=self.steps_list.get(0,last=self.steps_list.size())
+        image=self.convertToBinaryData("Recetario/Recetario/res/receta.png")
+        if(len(n)>=3 and len(ing)>0 and len(steps)>0):
+            r=receta.Recipe(n,image)
+            riList=list()
+            for i in ing:
+                print("Ingrediente "+i)
+                riList.append(receta.RecipeAndIngredient(n,i))
+            
+            rsList=list()
+            for s in steps:
+                rsList.append(receta.RecipeAndSteps(n,s))
+            recipe=receta.RecipeAllInfo(n,image,riList,rsList)
+            #self.addRecipeToDataBase(r,riList,rsList)
+        else:
+            print("no se puede guardar")
+        
 #endregion
     def loadAllIngrediennts(self):
         selectIngredients=bdd.select(receta.Ingredient)
         self.allIngredients=[]
         for ing in bdd.session.execute(selectIngredients):
-            print("bdd")
             self.allIngredients.append(ing[0])
+
+    def loadAllRecipes(self):
+        selectRecipes=bdd.select(receta.Recipe)
+        selectRecipesAndIngredients=bdd.select(receta.RecipeAndIngredient)
+        selectRecipesAndSteps=bdd.select(receta.RecipeAndSteps)
+
+        recipes=[]
+        for r in bdd.session.execute(selectRecipes):
+            recipes.append(r[0])
+
+        recipesAndIngredients=[]
+        for ri in bdd.session.execute(selectRecipesAndIngredients):
+            recipesAndIngredients.append(ri[0])
+
+        recipesAndSteps=[]
+        for rs in bdd.session.execute(selectRecipesAndSteps):
+            recipesAndSteps.append(rs[0])
+
+        self.allRecipes=[]
+        for r in recipes:
+            n=r.getName()
+            i=r.getImage()
+            ingredients=[]
+            steps=[]
+            for ri in recipesAndIngredients:
+                if(n==ri.getName()):
+                    ingredients.append(ri.getIngredient())
+
+            for rs in recipesAndSteps:
+                if(n==rs.getName()):
+                    steps.append(rs.getStep())
+            
+            self.allRecipes.append(receta.RecipeAllInfo(n,i,ingredients,steps))
+
     def removeIngredientFromDataBase(self,ing):
         bdd.session.delete(ing)
     def convertToBinaryData(self,filename):
@@ -448,10 +565,31 @@ class MyWindow:
         for ingredient in self.allIngredients:
             bdd.session.add(ingredient)
             bdd.session.commit()
-    
+    def saveRecipesOnDataBase(self):
+        for r in self.allRecipes:
+            recipe=receta.Recipe(r.getName(),r.getImage())
+            bdd.session.add(recipe)
+            bdd.session.commit()
+            for i in r.getIngredients():
+                bdd.session.add(receta.RecipeAndIngredient(r.getName(),i))
+                bdd.session.commit()
+            for s in r.getSteps():
+                bdd.session.add(receta.RecipeAndSteps(r.getName(),s))
+                bdd.session.commit()
+    def addRecipeToDataBase(self,r,riList,rsList):
+        bdd.session.add(r)
+        bdd.session.commit()
+
+        for ri in riList:
+            bdd.session.add(ri)
+            bdd.session.commit()
+        
+        for rs in rsList:
+            bdd.session.add(rs)
+            bdd.session.commit()
     def closeApp(self):
-        print("asdasdasdasd")
         self.saveIngredientsOnDataBase()
+        self.saveRecipesOnDataBase()
         self.root.destroy()
 
 bdd.Base.metadata.create_all(bdd.engine)

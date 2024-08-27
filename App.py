@@ -11,6 +11,7 @@ from tkinter.ttk import Combobox, Treeview
 
 from sqlalchemy import BLOB, null
 import Receta as receta
+import PDFCreator as pdf
 import Bdd as bdd
 from tkinter import *
 import tkinter as tk
@@ -25,6 +26,7 @@ class Frames(Enum):
     ADD_INGREDIENTS=5
     SEE_INGREDIENTS=6
     EDIT_INGREDIENTS=7
+    EDIT_RECIPES=8
 
 class MyWindow:
 
@@ -89,7 +91,7 @@ class MyWindow:
         seeRecipe_button=Button(recipeMenu_frame, text="See recipes",command=lambda:self.changePanel(recipeMenu_frame,Frames.SEE_RECIPES))
         seeRecipe_button.grid(column=1,row=2,sticky=(N,E,S,W))
 
-        export_button=Button(recipeMenu_frame, text="Export recipes",command=lambda:self.changePanel(recipeMenu_frame,Frames.INGREDIENTS_MENU))
+        export_button=Button(recipeMenu_frame, text="Export recipes",command=self.createPDF())
         export_button.grid(column=1,row=3,sticky=(N,E,S,W))
 
         return_button=Button(recipeMenu_frame, text="Return",command=lambda:self.changePanel(recipeMenu_frame,Frames.MAIN_MENU))
@@ -262,9 +264,9 @@ class MyWindow:
             self.ingredients_table.insert(parent='',index='end',iid=row,text='',values=(ing.name,ing.measurement),image=photo)
             self.ingredients_table.rowconfigure(index=row,minsize=300)
             row=row+1
-        self.ingredients_table.bind("<<TreeviewSelect>>", lambda s: self.selectIngredientToEdit())
+        self.ingredients_table.bind("<<TreeviewSelect>>", lambda s: self.changeEditIngredientButton())
         #Buttons
-        self.editIngredient_button=Button(seeRecipe_frame, text="Edit ingredient",command=lambda:self.selectItemToEdit(seeRecipe_frame,Frames.EDIT_INGREDIENTS),state=tk.DISABLED)
+        self.editIngredient_button=Button(seeRecipe_frame, text="Edit ingredient",command=lambda:self.selectIngredientToEdit(seeRecipe_frame,Frames.EDIT_INGREDIENTS),state=tk.DISABLED)
         self.editIngredient_button.grid(column=0,row=2,sticky=(N,E,S,W))
 
         return_button=Button(seeRecipe_frame, text="Return",command=lambda:self.changePanel(seeRecipe_frame,Frames.INGREDIENTS_MENU))
@@ -348,13 +350,90 @@ class MyWindow:
             self.recipes_table.insert(parent='',index='end',iid=row,text='',values=(r.name),image=photo)
             self.recipes_table.rowconfigure(index=row,minsize=300)
             row=row+1
-        self.recipes_table.bind("<<TreeviewSelect>>", lambda s: self.selectIngredientToEdit())
+        self.recipes_table.bind("<<TreeviewSelect>>", lambda s: self.changeEditRecipeButton())
         #Buttons
-        self.editIngredient_button=Button(seeRecipe_frame, text="Edit ingredient",command=lambda:self.selectItemToEdit(seeRecipe_frame,Frames.EDIT_INGREDIENTS),state=tk.DISABLED)
-        self.editIngredient_button.grid(column=0,row=2,sticky=(N,E,S,W))
+        self.editRecipe_button=Button(seeRecipe_frame, text="See recipe",command=lambda:self.selectRecipeToEdit(seeRecipe_frame,Frames.EDIT_RECIPES),state=tk.DISABLED)
+        self.editRecipe_button.grid(column=0,row=2,sticky=(N,E,S,W))
 
         return_button=Button(seeRecipe_frame, text="Return",command=lambda:self.changePanel(seeRecipe_frame,Frames.RECIPES_MENU))
         return_button.grid(column=1,row=2,sticky=(N,E,S,W))
+    
+    def setAddRecipeFrame(self):
+        addRecipe_frame=self.configureFrame(6,7)
+        addRecipe_frame.grid_rowconfigure(3,weight=1)
+        addRecipe_frame.grid_columnconfigure(2,weight=1)
+
+        #Name of the recipe
+        name=""
+        name_label=Label(addRecipe_frame,text="Name:")
+        name_label.grid(column=1,row=0,sticky=(N,E,S,W)) 
+
+        self.name_entry=Entry(addRecipe_frame, textvariable=name)
+        self.name_entry.grid(column=2,columnspan=3,row=0,sticky=(N,E,S,W))
+
+        #Ingredient info
+        ingredient_label=Label(addRecipe_frame,text="Ingredient:")
+        ingredient_label.grid(column=1,row=1,sticky=(N,E,S,W)) 
+
+        ingredient=""
+        ingredientsNames=[]
+        for ing in self.allIngredients:
+            ingredientsNames.append(ing.name)
+        self.ingredients_combo=Combobox(addRecipe_frame,values=ingredientsNames,textvariable=ingredient)
+        self.ingredients_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
+        self.ingredients_combo.bind('<<ComboboxSelected>>', self.comboBoxModified)
+        #ingredients_combo=ComboBox(addRecipe_frame,values=["a","b","c"],textvariable=ingredient)
+        #ingredients_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
+
+        self.quantity_entry=Entry(addRecipe_frame)
+        self.quantity_entry.grid(column=3,row=1,sticky=(N,E,S,W))
+
+        addIngredient_button=Button(addRecipe_frame, text="Add",command=self.addIngredientToRecipe)
+        addIngredient_button.grid(column=4,row=1,sticky=(N,E,S,W))
+
+        #Ingredients list
+        self.ingredients_list=Listbox(addRecipe_frame,height=1)#,listvariable=self.to_do_names)
+        self.ingredients_list.grid(column=1,columnspan=4,row=2,sticky=(N,E,S,W))
+        scrollBar=ttk.Scrollbar(self.ingredients_list,orient="vertical",command=self.ingredients_list.yview)
+        scrollBar.pack(side='right', fill='y')
+        self.ingredients_list.configure(yscrollcommand=scrollBar.set)
+
+        #Steps info
+        step_label=Label(addRecipe_frame,text="Step:")
+        step_label.grid(column=1,row=3,sticky=(N,E,S,W)) 
+
+        self.step_text=Text(addRecipe_frame,wrap="word",width=1,height=1)
+        self.step_text.grid(column=2,columnspan=2,row=3,sticky="nsew")
+
+        addStep_button=Button(addRecipe_frame, text="Add",command=self.addStepToList)
+        addStep_button.grid(column=4,row=3,sticky=(N,E,S,W))
+
+        #Steps list
+        self.steps_list=Listbox(addRecipe_frame,height=1)
+        self.steps_list.grid(column=1,columnspan=4,row=4,sticky=(N,E,S,W))
+        scrollBar=ttk.Scrollbar(self.steps_list,orient="vertical",command=self.steps_list.yview)
+        scrollBar.pack(side='right', fill='y')
+        self.steps_list.configure(yscrollcommand=scrollBar.set)
+
+        #Image selection
+        imageText_label=Label(addRecipe_frame,text="Image:")
+        imageText_label.grid(column=1,row=5,sticky=(N,E,S,W)) 
+
+        pi=PhotoImage(file="Recetario/Recetario/res/receta.png")
+        pi=pi.subsample(10,10)
+        image_label=Label(addRecipe_frame,image=pi)
+        image_label.image=pi
+        image_label.grid(column=2,row=5,sticky=(N,E,S,W))
+
+        browseImage_button=Button(addRecipe_frame, text="Browse image",command=self.select_image)
+        browseImage_button.grid(column=3,row=5,sticky=(N,E,S,W))
+
+        #Buttons
+        addRecipe_button=Button(addRecipe_frame, text="Add recipe",command=self.addRecipe)
+        addRecipe_button.grid(column=2,row=6,sticky=(N,E,S,W))
+
+        return_button=Button(addRecipe_frame, text="Return",command=lambda:self.changePanel(addRecipe_frame,Frames.RECIPES_MENU))
+        return_button.grid(column=3,row=6,sticky=(N,E,S,W))
 
     def changePanel(self,frameToClose,frameToChange):
         frameToClose.destroy()
@@ -375,6 +454,8 @@ class MyWindow:
             self.setEditIngredientFrame()
         elif(frameToChange==Frames.SEE_RECIPES):
             self.setSeeRecipes()
+        elif(frameToChange==Frames.EDIT_RECIPES):
+            self.setAddRecipeFrame()
 
 #endregion
 
@@ -415,11 +496,11 @@ class MyWindow:
         self.ingredientToEdit=null
         self.changePanel(editFrame,Frames.SEE_INGREDIENTS)
      
-    def selectIngredientToEdit(self):
+    def changeEditIngredientButton(self):
         if(self.editIngredient_button["state"]==tk.DISABLED):
             self.editIngredient_button["state"]=tk.NORMAL
         
-    def selectItemToEdit(self,frameToClose,frameToChange):
+    def selectIngredientToEdit(self,frameToClose,frameToChange):
         ingredientToEdit=self.ingredients_table.item(self.ingredients_table.focus())
         
         ingredientName=ingredientToEdit["values"][0]
@@ -498,11 +579,28 @@ class MyWindow:
             rsList=list()
             for s in steps:
                 rsList.append(receta.RecipeAndSteps(n,s))
-            recipe=receta.RecipeAllInfo(n,image,riList,rsList)
+            recipe=receta.RecipeAllInfo(n,image,ing,steps)
+            self.allRecipes.append(recipe)
             #self.addRecipeToDataBase(r,riList,rsList)
         else:
             print("no se puede guardar")
+
+    def changeEditRecipeButton(self):
+        if(self.editRecipe_button["state"]==tk.DISABLED):
+            self.editRecipe_button["state"]=tk.NORMAL
+
+    def selectIngredientToEdit(self,frameToClose,frameToChange):
+        recipeToEdit=self.recipes_table.item(self.recipes_table.focus())
         
+        recipeName=recipeToEdit["values"][0]
+        for r in self.allRecipes:
+            print(r.getName()+" "+recipeName)
+            if(r.getName()==recipeName):
+                self.recipeToEdit=r
+                break
+        
+        self.changePanel(frameToClose,frameToChange)
+     
 #endregion
     def loadAllIngrediennts(self):
         selectIngredients=bdd.select(receta.Ingredient)
@@ -567,15 +665,20 @@ class MyWindow:
             bdd.session.commit()
     def saveRecipesOnDataBase(self):
         for r in self.allRecipes:
-            recipe=receta.Recipe(r.getName(),r.getImage())
-            bdd.session.add(recipe)
-            bdd.session.commit()
-            for i in r.getIngredients():
-                bdd.session.add(receta.RecipeAndIngredient(r.getName(),i))
+            q = bdd.session.query(receta.Recipe.name).filter(receta.Recipe.name==r.getName())
+            print(bdd.session.query(q.exists()).scalar())
+            if(bdd.session.query(q.exists()).scalar()==False):
+                print(r.getName())
+                recipe=receta.Recipe(r.getName(),r.getImage())
+                bdd.session.add(recipe)
                 bdd.session.commit()
-            for s in r.getSteps():
-                bdd.session.add(receta.RecipeAndSteps(r.getName(),s))
-                bdd.session.commit()
+                for i in r.getIngredients():
+                    print(i)
+                    bdd.session.add(receta.RecipeAndIngredient(r.getName(),i))
+                    bdd.session.commit()
+                for s in r.getSteps():
+                    bdd.session.add(receta.RecipeAndSteps(r.getName(),s))
+                    bdd.session.commit()
     def addRecipeToDataBase(self,r,riList,rsList):
         bdd.session.add(r)
         bdd.session.commit()
@@ -591,7 +694,8 @@ class MyWindow:
         self.saveIngredientsOnDataBase()
         self.saveRecipesOnDataBase()
         self.root.destroy()
-
+    def createPDF(self):
+        pdf.CreatePdf(self.allRecipes,"Recetario.pdf")
 bdd.Base.metadata.create_all(bdd.engine)
 root=Tk()
 root.geometry("600x600")

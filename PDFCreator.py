@@ -1,5 +1,8 @@
+import PIL
+import io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
 import Receta as receta
 
 def CreatePdf(allRecipes,path):
@@ -15,6 +18,9 @@ def CreatePdf(allRecipes,path):
     c.showPage()
 
     for r in allRecipes:
+        im = PIL.Image.open(io.BytesIO(r.getImage()))
+        img=ImageReader(im)
+        c.drawImage(img,100, h - 100,width=50, height=50)
         text = c.beginText(50, h - 50)
         text.setFont("Times-Roman", 24)
         text.textLine(r.getName())

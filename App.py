@@ -175,11 +175,12 @@ class MyWindow:
         imageText_label=Label(addRecipe_frame,text="Image:")
         imageText_label.grid(column=1,row=5,sticky=(N,E,S,W)) 
 
-        pi=PhotoImage(file="Recetario/Recetario/res/receta.png")
+        self.recipeImagePath="Recetario/Recetario/res/receta.png"
+        pi=PhotoImage(file=self.recipeImagePath)
         pi=pi.subsample(10,10)
-        image_label=Label(addRecipe_frame,image=pi)
-        image_label.image=pi
-        image_label.grid(column=2,row=5,sticky=(N,E,S,W))
+        self.recipeImage_label=Label(addRecipe_frame,image=pi)
+        self.recipeImage_label.image=pi
+        self.recipeImage_label.grid(column=2,row=5,sticky=(N,E,S,W))
 
         browseImage_button=Button(addRecipe_frame, text="Browse image",command=self.select_image)
         browseImage_button.grid(column=3,row=5,sticky=(N,E,S,W))
@@ -192,44 +193,43 @@ class MyWindow:
         return_button.grid(column=3,row=6,sticky=(N,E,S,W))
 
     def setAddIngredientFrame(self):
-        addRecipe_frame=self.configureFrame(5,4)
+        addIngredient=self.configureFrame(5,4)
 
         #Name of the recipe
-        name_label=Label(addRecipe_frame,text="Name:")
+        name_label=Label(addIngredient,text="Name:")
         name_label.grid(column=1,row=0,sticky=(N,E,S,W)) 
 
-        self.ingredientName_entry=Entry(addRecipe_frame)
+        self.ingredientName_entry=Entry(addIngredient)
         self.ingredientName_entry.grid(column=2,columnspan=2,row=0,sticky=(N,E,S,W))
 
         #Ingredient info
-        ingredient_label=Label(addRecipe_frame,text="Measurement:")
+        ingredient_label=Label(addIngredient,text="Measurement:")
         ingredient_label.grid(column=1,row=1,sticky=(N,E,S,W)) 
 
         measurement=""
-        self.measurement_combo=Combobox(addRecipe_frame,values=["Quantity","Litres","Grams","Cups","Spoons","None"])
+        self.measurement_combo=Combobox(addIngredient,values=["Quantity","Litres","Grams","Cups","Spoons","None"])
         self.measurement_combo.current(0)
         self.measurement_combo.grid(column=2,row=1,sticky=(N,E,S,W)) 
 
         #Image selection
-        imageText_label=Label(addRecipe_frame,text="Image:")
+        imageText_label=Label(addIngredient,text="Image:")
         imageText_label.grid(column=1,row=2,sticky=(N,E,S,W)) 
 
 
         self.ingredientImagePath="Recetario/Recetario/res/ingrediente.png"
         pi=PhotoImage(file=self.ingredientImagePath)
         pi=pi.subsample(10,10)
-        ingredientImage_label=Label(addRecipe_frame,image=pi)
-        ingredientImage_label.image=pi
-        ingredientImage_label.grid(column=2,row=2,sticky=(N,E,S,W))
-
-        browseImage_button=Button(addRecipe_frame, text="Browse image",command=self.select_image)
+        self.ingredientImage_label=Label(addIngredient,image=pi)
+        self.ingredientImage_label.image=pi
+        self.ingredientImage_label.grid(column=2,row=2,sticky=(N,E,S,W))
+        browseImage_button=Button(addIngredient, text="Browse image",command=lambda:self.select_image(TRUE))
         browseImage_button.grid(column=3,row=2,sticky=(N,E,S,W))
 
         #Buttons
-        addIngredient_button=Button(addRecipe_frame, text="Add ingredient",command=self.addIngredient)
+        addIngredient_button=Button(addIngredient, text="Add ingredient",command=self.addIngredient)
         addIngredient_button.grid(column=1,row=3,sticky=(N,E,S,W))
 
-        return_button=Button(addRecipe_frame, text="Return",command=lambda:self.changePanel(addRecipe_frame,Frames.INGREDIENTS_MENU))
+        return_button=Button(addIngredient, text="Return",command=lambda:self.changePanel(addIngredient,Frames.INGREDIENTS_MENU))
         return_button.grid(column=3,row=3,sticky=(N,E,S,W))
 
     def setSeeIngredientsFrame(self):
@@ -649,16 +649,31 @@ class MyWindow:
             blobData = file.read()
         return blobData
 
-    def select_image(self):
+    def select_image(self,isIngredient=FALSE):
         filetypes = (
-        ('text files', '*.txt'),
-        ('All files', '*.*')
+        ('Image files', '*.PNG'),
+        ('All files','*.*')
         )
 
         filename = filedialog.askopenfilename(
         title='Open a file',
         initialdir='/',
         filetypes=filetypes)
+
+        if(isIngredient):
+            self.ingredientImagePath=filename
+            pi=PhotoImage(file=self.ingredientImagePath)
+            pi=pi.subsample(10,10)
+            self.ingredientImage_label.configure(image=pi)
+            self.ingredientImage_label.image=pi
+        else:
+            self.recipeImagePath=filename
+            pi=PhotoImage(file=self.recipeImagePath)
+            pi=pi.subsample(10,10)
+            self.recipeImage_label.configure(image=pi)
+            self.recipeImage_label.image=pi
+        
+        print(filename)
     def saveIngredientsOnDataBase(self):
         for ingredient in self.allIngredients:
             bdd.session.add(ingredient)
